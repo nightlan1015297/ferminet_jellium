@@ -65,6 +65,8 @@ For the default (N=2, r_s=4): E_DMC = -1.7440 eV/electron, i.e. a total energy o
 (or slightly lower, being variational with optimised nodes).
 """
 
+import os
+
 from ferminet import base_config
 from ferminet.jellium import hamiltonian as jellium_hamiltonian
 from ferminet.utils import system
@@ -125,6 +127,40 @@ def set_jellium_sphere(cfg):
     # init_width <= 0 means "auto"; a positive value is taken as given.
     if float(cfg.mcmc.init_width) <= 0:
       cfg.mcmc.init_width = float(r_b)
+
+  # ----------------------------------------------------------------------------
+  # Checkpoint paths. Derived here -- i.e. *after* the command line is parsed --
+  # so they reflect any overridden settings rather than the file defaults.
+  #
+  #   * save_path    == 'auto' -> ./results/<run-name built from the resolved
+  #                               system + ansatz>, so distinct settings never
+  #                               clobber each other's checkpoints.
+  #   * restore_path == 'auto' -> the same directory as save_path, so re-running
+  #                               with identical knobs resumes in place. Pass an
+  #                               explicit --config.log.restore_path to branch
+  #                               from a different run instead.
+  # Any explicit value (set in this file or on the command line) is left as-is.
+  # ----------------------------------------------------------------------------
+  run_name = (
+      f'jellium_N{n}_rs{r_s:g}_nbg{n_background:g}'
+      f'_{cfg.network.network_type}_det{int(cfg.network.determinants)}'
+  )
+  if cfg.log.save_path == 'auto':
+    cfg.log.save_path = os.path.join('results', run_name)
+  if cfg.log.restore_path == 'auto':
+    cfg.log.restore_path = cfg.log.save_path
+
+  # Record exactly what was run, next to the checkpoints, so the output
+  # directory is self-documenting (train.py does not persist the config itself).
+  # Skipped when save_path is empty (i.e. a timestamped dir chosen later).
+  if cfg.log.save_path:
+    try:
+      os.makedirs(cfg.log.save_path, exist_ok=True)
+      with open(os.path.join(cfg.log.save_path, 'config.txt'), 'w') as f:
+        f.write(repr(cfg.copy_and_resolve_references()))
+    except (OSError, TypeError) as e:  # never let logging kill a training run
+      print(f'[jellium_sphere] could not write config record: {e}')
+
   return cfg
 
 
@@ -204,8 +240,10 @@ def get_config():
   # ----------------------------------------------------------------------------
   cfg.log.save_frequency = 30.0    # Minutes between checkpoints.
   cfg.log.stats_frequency = 1      # Iterations between stats logging.
-  cfg.log.save_path = './results/'           # Checkpoint dir ('' => timestamped dir).
-  cfg.log.restore_path = ''        # Checkpoint to restore from ('' => none).
+  # 'auto' => derive from the resolved system in set_jellium_sphere (below).
+  # Set an explicit path here or on the command line to override.
+  cfg.log.save_path = 'auto'       # './results/<run-name>'; '' => timestamped dir.
+  cfg.log.restore_path = 'auto'    # Same dir as save_path; '' => no restore.
 
   # ----------------------------------------------------------------------------
   # Observables (optional; off by default).

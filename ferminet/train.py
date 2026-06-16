@@ -537,6 +537,10 @@ def train(cfg: ml_collections.ConfigDict, writer_manager=None):
     )
   key, subkey = jax.random.split(key)
   params = network.init(subkey)
+  # Log the size of the ansatz (counted before replicating across devices).
+  num_params = sum(x.size for x in jax.tree_util.tree_leaves(params))
+  logging.info('Network: %s with %s trainable parameters.',
+               cfg.network.network_type, f'{num_params:,}')
   params = kfac_jax.utils.replicate_all_local_devices(
       params, axis_name=constants.PMAP_AXIS_NAME
   )
