@@ -113,7 +113,7 @@ def get_config():
   # of the confined droplet's orbitals, so no custom envelope/feature layer is
   # needed (contrast the periodic HEG in ferminet.pbc).
   cfg.network.network_type = 'psiformer'
-  cfg.network.determinants = 16
+  cfg.network.determinants = 4
   cfg.network.full_det = True
 
   # Modest training budget appropriate for a small (default 2-electron) system.
