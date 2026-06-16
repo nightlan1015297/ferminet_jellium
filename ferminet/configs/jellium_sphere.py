@@ -176,9 +176,9 @@ def get_config():
   # 2-electron) system; scale batch_size / iterations up for larger N.
   # ----------------------------------------------------------------------------
   cfg.batch_size = 1024            # MCMC walkers / batch size.
-  cfg.optim.iterations = 10000     # Number of optimisation steps.
+  cfg.optim.iterations = 150000     # Number of optimisation steps.
   cfg.optim.optimizer = 'kfac'     # 'kfac', 'adam', 'lamb', or 'none'.
-  cfg.optim.laplacian = 'default'  # 'default' or 'folx' (forward laplacian).
+  cfg.optim.laplacian = 'folx'  # 'default' or 'folx' (forward laplacian).
   cfg.optim.lr.rate = 0.05         # Learning rate.
   cfg.optim.lr.decay = 1.0         # Learning-rate decay exponent.
   cfg.optim.lr.delay = 10000.0     # Learning-rate decay scale.
@@ -190,8 +190,8 @@ def get_config():
   # ----------------------------------------------------------------------------
   # MCMC sampling.
   # ----------------------------------------------------------------------------
-  cfg.mcmc.burn_in = 100           # Burn-in steps before optimisation.
-  cfg.mcmc.steps = 10              # MCMC steps between network updates.
+  cfg.mcmc.burn_in = 200           # Burn-in steps before optimisation.
+  cfg.mcmc.steps = 20              # MCMC steps between network updates.
   # Width of the Gaussian used to place the initial walkers. <= 0 => auto
   # (spread over the whole background sphere, R_B); see set_jellium_sphere.
   cfg.mcmc.init_width = 0.0
@@ -202,9 +202,9 @@ def get_config():
   # ----------------------------------------------------------------------------
   # Logging / checkpointing.
   # ----------------------------------------------------------------------------
-  cfg.log.save_frequency = 10.0    # Minutes between checkpoints.
+  cfg.log.save_frequency = 30.0    # Minutes between checkpoints.
   cfg.log.stats_frequency = 1      # Iterations between stats logging.
-  cfg.log.save_path = ''           # Checkpoint dir ('' => timestamped dir).
+  cfg.log.save_path = './results/'           # Checkpoint dir ('' => timestamped dir).
   cfg.log.restore_path = ''        # Checkpoint to restore from ('' => none).
 
   # ----------------------------------------------------------------------------
