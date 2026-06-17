@@ -60,6 +60,7 @@ setup(
     entry_points={
         'console_scripts': [
             'ferminet = ferminet.main:main_wrapper',
+            'ferminet_infer = ferminet.inference:main_wrapper',
         ],
     },
     packages=find_packages(),
