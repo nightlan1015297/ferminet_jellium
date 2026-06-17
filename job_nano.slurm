@@ -53,8 +53,14 @@ echo ""
 #---------------------------------------------------------------------#
 echo "Running script..."
 # NOTE: Ensure this path points to your actual python script
-ferminet --config ferminet/configs/jellium_sphere.py --config.system.n_electrons 2 --config.system.r_s 1
-
+# ferminet --config ferminet/configs/jellium_sphere.py --config.system.n_electrons 2 --config.system.r_s 1
+ferminet --config ferminet/configs/jellium_sphere.py \
+    --config.system.n_electrons 2 \
+    --config.system.r_s 1.0 \
+    --config.batch_size 8192 \
+    --config.optim.kfac.damping 0.0001 \
+    --config.mcmc.steps 30 \
+    --config.optim.iterations 150000
 # Check the exit code of Python script
 EXIT_CODE=$?
 if [ $EXIT_CODE -ne 0 ]; then
