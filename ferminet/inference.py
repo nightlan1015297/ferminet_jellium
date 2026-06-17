@@ -37,7 +37,10 @@ the trained checkpoint. It restores only the trained *parameters* and
 re-initialises the walkers at the requested batch size on the current devices,
 then lets ``train.train`` re-equilibrate them with the configured MCMC burn-in
 before accumulation. The trained run's outputs are never touched: results are
-written to a separate ``..._inference_*`` directory.
+written to an ``inference_*`` subdirectory *inside* the restored run's directory.
+The frozen network parameters are written once (in the staged checkpoint) and
+deliberately omitted from the periodic checkpoints saved during the run, since
+they never change.
 
 Usage mirrors training -- pass the *same* system flags you trained with::
 
@@ -265,7 +268,17 @@ def stage_inference_checkpoint(cfg, trained_ckpt, infer_dir):
     except (KeyError, ValueError):
       mcmc_width = np.asarray([cfg.mcmc.move_width])
 
+  # Trained checkpoints store params replicated across the *training* devices, so
+  # each leaf carries a leading axis equal to the trained device count. Strip it
+  # (take the device-0 copy) and re-replicate for the *current* device topology.
+  # Without this, pmap on a different number of devices fails with an
+  # IndivisibleError (e.g. params trained on 6 GPUs but inferring on 4: a leaf of
+  # shape (6, ...) cannot be sharded across 4 devices). Re-replicating with the
+  # current num_devices keeps the leading axis consistent with the fresh walkers.
+  params = jax.tree_util.tree_map(lambda x: np.asarray(x)[0], params)
   num_params = int(sum(np.size(x) for x in jax.tree_util.tree_leaves(params)))
+  params = jax.tree_util.tree_map(
+      lambda x: np.repeat(x[None], num_devices, axis=0), params)
 
   # Fresh walkers at the requested batch size, mirroring train.train's setup
   # (positions/spins from init_electrons; per-walker atoms/charges tiled).
@@ -346,11 +359,13 @@ def main(argv):
   if flags_values.burn_in >= 0:
     cfg.mcmc.burn_in = flags_values.burn_in
 
-  # Inference outputs go to their own directory so the trained run's
-  # train_stats.csv / checkpoints are never overwritten.
-  infer_dir = flags_values.save_path or (
-      f'{train_dir.rstrip(os.sep)}_inference'
-      f'_b{cfg.batch_size}_s{cfg.optim.iterations}')
+  # Inference outputs go to a subdirectory *inside* the restored run's directory
+  # so the results live alongside the checkpoint they came from, while the
+  # trained run's own train_stats.csv / checkpoints (directly in train_dir) are
+  # never overwritten.
+  infer_dir = flags_values.save_path or os.path.join(
+      train_dir.rstrip(os.sep),
+      f'inference_b{cfg.batch_size}_s{cfg.optim.iterations}')
   if os.path.abspath(infer_dir) == os.path.abspath(train_dir):
     raise SystemExit('Refusing to write inference output into the trained run '
                      f'directory {train_dir!r}; choose a different --save_path.')
@@ -452,7 +467,7 @@ def main_wrapper():
   flags.DEFINE_string(
       'save_path', '',
       'Directory for inference output. Defaults to '
-      '"<trained-dir>_inference_b<batch>_s<steps>".')
+      '"<trained-dir>/inference_b<batch>_s<steps>".')
   app.run(main)
 
 

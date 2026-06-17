@@ -95,7 +95,8 @@ def save(save_path: str,
          params,
          opt_state,
          mcmc_width,
-         density_state: Optional[observables.DensityState] = None) -> str:
+         density_state: Optional[observables.DensityState] = None,
+         save_params: bool = True) -> str:
   """Saves checkpoint information to a npz file.
 
   Args:
@@ -108,6 +109,12 @@ def save(save_path: str,
     opt_state: optimization state.
     mcmc_width: width to use in the MCMC proposal distribution.
     density_state: optional state of the density matrix calculation
+    save_params: whether to write the network parameters. Set False during
+      fixed-parameter inference, where the (frozen) params never change and so
+      need only be stored once (in the initial staged checkpoint); the periodic
+      checkpoints then carry just the evolving walker/MCMC state. On restore,
+      :func:`restore` recovers the params from the params-bearing checkpoint in
+      the same directory.
 
   Returns:
     path to checkpoint file.
@@ -119,12 +126,43 @@ def save(save_path: str,
         f,
         t=t,
         data=dataclasses.asdict(data),
-        params=params,
+        params=(params if save_params else {}),
         opt_state=np.asarray(opt_state, dtype=object),
         mcmc_width=mcmc_width,
         density_state=(dataclasses.asdict(density_state)
                        if density_state else None))
   return ckpt_filename
+
+
+def _restore_params(ckpt_dir: Optional[str]):
+  """Recovers network params from a params-bearing checkpoint in a directory.
+
+  Fixed-parameter inference omits the (frozen) params from its periodic
+  checkpoints (see :func:`save`), so a checkpoint restored mid-run may not carry
+  them. This scans ``ckpt_dir`` for the first checkpoint that does contain
+  params. Checkpoints are scanned in ascending filename order, so the staged
+  checkpoint written at iteration -1 (``qmcjax_ckpt_-00001.npz`` -- the '-' sorts
+  before the positive iterations) is found ahead of the param-less ones.
+
+  Args:
+    ckpt_dir: directory to search for a params-bearing checkpoint.
+
+  Returns:
+    The params pytree, or None if no checkpoint with params is found.
+  """
+  if not ckpt_dir or not os.path.exists(ckpt_dir):
+    return None
+  files = sorted(f for f in os.listdir(ckpt_dir) if 'qmcjax_ckpt_' in f)
+  for file in files:
+    fname = os.path.join(ckpt_dir, file)
+    try:
+      with open(fname, 'rb') as f:
+        params = np.load(f, allow_pickle=True)['params'].tolist()
+    except (OSError, EOFError, zipfile.BadZipFile, KeyError):
+      continue
+    if params:
+      return params
+  return None
 
 
 def restore(restore_filename: str, batch_size: Optional[int] = None):
@@ -159,6 +197,14 @@ def restore(restore_filename: str, batch_size: Optional[int] = None):
     t = ckpt_data['t'].tolist() + 1  # Return the iterations completed.
     data = networks.FermiNetData(**ckpt_data['data'].item())
     params = ckpt_data['params'].tolist()
+    if not params:
+      # Inference checkpoints omit the frozen params (see save()); recover them
+      # from the staged params-bearing checkpoint in the same directory.
+      params = _restore_params(os.path.dirname(restore_filename))
+      if not params:
+        raise ValueError(
+            f'Checkpoint {restore_filename!r} contains no network parameters '
+            'and none could be recovered from its directory.')
     opt_state = ckpt_data['opt_state'].tolist()
     mcmc_width = jnp.array(ckpt_data['mcmc_width'].tolist())
     if ckpt_data['density_state']:

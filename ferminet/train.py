@@ -1069,7 +1069,12 @@ def train(cfg: ml_collections.ConfigDict, writer_manager=None):
       # Checkpointing
       if time.time() - time_of_last_ckpt > cfg.log.save_frequency * 60:
         writer.flush()
-        checkpoint.save(ckpt_save_path, t, data, params, opt_state, mcmc_width)
+        # During fixed-parameter inference (optimizer 'none') the params never
+        # change, so don't rewrite them in every checkpoint; they're recovered
+        # from the staged checkpoint on restore (see checkpoint.save/restore).
+        checkpoint.save(
+            ckpt_save_path, t, data, params, opt_state, mcmc_width,
+            save_params=cfg.optim.optimizer != 'none')
         time_of_last_ckpt = time.time()
 
     # Shut down logging at end
