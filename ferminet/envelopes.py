@@ -35,6 +35,8 @@ class EnvelopeType(enum.Enum):
 class EnvelopeLabel(enum.Enum):
   """Available multiplicative envelope functions."""
   ISOTROPIC = enum.auto()
+  GAUSSIAN = enum.auto()
+  SOFTENED_EXPONENTIAL = enum.auto()
   BOTTLENECK = enum.auto()
   DIAGONAL = enum.auto()
   FULL = enum.auto()
@@ -120,6 +122,89 @@ def make_isotropic_envelope() -> Envelope:
     """Computes an isotropic exponentially-decaying multiplicative envelope."""
     del ae, r_ee  # unused
     return jnp.sum(jnp.exp(-r_ae * sigma) * pi, axis=1)
+
+  return Envelope(EnvelopeType.PRE_DETERMINANT, init, apply)
+
+
+def make_gaussian_envelope() -> Envelope:
+  """Creates an isotropic *Gaussian* multiplicative envelope: exp(-sigma r^2).
+
+  Unlike the exponential envelopes (exp(-sigma |r|), which reproduce the Kato
+  cusp of a point nucleus), exp(-sigma r^2) is an even, analytic function of the
+  electron-centre distance: it has zero radial derivative at r = 0 and therefore
+  imposes *no* spurious cusp at the centre. This matches a confining potential
+  that is smooth at the origin -- e.g. the finite jellium sphere, whose external
+  potential is harmonic (V_ext ~ const + r^2) inside the background -- for which
+  the exact single-particle ground state is itself Gaussian. The trade-off is a
+  faster (Gaussian) tail than the exp(-sigma r) envelope; for a compact, high-
+  density droplet (small r_s) the interior dominates and this is favourable.
+
+  sigma is expected to stay positive (it is initialised to 1); a negative sigma
+  yields a non-normalisable orbital. If this destabilises training, enable
+  cfg.network.reset_if_nan.
+  """
+
+  def init(
+      natom: int, output_dims: Sequence[int], ndim: int = 3
+  ) -> Sequence[Mapping[str, jnp.ndarray]]:
+    del ndim  # unused
+    params = []
+    for output_dim in output_dims:
+      params.append({
+          'pi': jnp.ones(shape=(natom, output_dim)),
+          'sigma': jnp.ones(shape=(natom, output_dim))
+      })
+    return params
+
+  def apply(*, ae: jnp.ndarray, r_ae: jnp.ndarray, r_ee: jnp.ndarray,
+            pi: jnp.ndarray, sigma: jnp.ndarray) -> jnp.ndarray:
+    """Computes an isotropic Gaussian multiplicative envelope."""
+    del ae, r_ee  # unused
+    return jnp.sum(jnp.exp(-r_ae**2 * sigma) * pi, axis=1)
+
+  return Envelope(EnvelopeType.PRE_DETERMINANT, init, apply)
+
+
+def make_softened_exponential_envelope() -> Envelope:
+  r"""Creates an envelope exp(-sigma * sqrt(r_ae^2 + a^2)) (softened exponential).
+
+  The physically correct envelope skeleton for a finite jellium sphere. It is
+  *smooth* at r = 0 (like a Gaussian, so it imposes no spurious cusp at the
+  centre, where the confining potential is harmonic) yet decays *exponentially*
+  in the tail:
+
+      r -> 0   : sqrt(r^2 + a^2) ~ a + r^2/(2a)  => Gaussian core, zero slope
+      r -> inf : sqrt(r^2 + a^2) -> r            => exp(-sigma r), Coulomb tail
+
+  matching the asymptotics of a neutral cluster (the escaping electron sees a net
+  +1 charge, giving exp(-sqrt(2 I) r) decay). The softening length ``a`` sets the
+  core<->tail crossover; both ``a`` and ``sigma`` are learnable, one per orbital.
+
+  ``a`` enters only as a^2, so its sign is irrelevant (no sign-flip blow-up). As
+  a -> 0 this reduces to the cusped isotropic envelope exp(-sigma |r|); ``sigma``
+  is expected to stay positive (a negative value gives a non-normalisable
+  orbital -- enable cfg.network.reset_if_nan if it destabilises training).
+  """
+
+  def init(
+      natom: int, output_dims: Sequence[int], ndim: int = 3
+  ) -> Sequence[Mapping[str, jnp.ndarray]]:
+    del ndim  # unused
+    params = []
+    for output_dim in output_dims:
+      params.append({
+          'pi': jnp.ones(shape=(natom, output_dim)),
+          'sigma': jnp.ones(shape=(natom, output_dim)),
+          'a': jnp.ones(shape=(natom, output_dim)),
+      })
+    return params
+
+  def apply(*, ae: jnp.ndarray, r_ae: jnp.ndarray, r_ee: jnp.ndarray,
+            pi: jnp.ndarray, sigma: jnp.ndarray, a: jnp.ndarray) -> jnp.ndarray:
+    """Computes a softened-exponential multiplicative envelope."""
+    del ae, r_ee  # unused
+    softened_r = jnp.sqrt(r_ae**2 + a**2)
+    return jnp.sum(jnp.exp(-softened_r * sigma) * pi, axis=1)
 
   return Envelope(EnvelopeType.PRE_DETERMINANT, init, apply)
 
@@ -310,6 +395,8 @@ def get_envelope(
       EnvelopeLabel.STO: make_sto_envelope,
       EnvelopeLabel.STO_POLY: make_sto_poly_envelope,
       EnvelopeLabel.ISOTROPIC: make_isotropic_envelope,
+      EnvelopeLabel.GAUSSIAN: make_gaussian_envelope,
+      EnvelopeLabel.SOFTENED_EXPONENTIAL: make_softened_exponential_envelope,
       EnvelopeLabel.BOTTLENECK: make_bottleneck_envelope,
       EnvelopeLabel.DIAGONAL: make_diagonal_envelope,
       EnvelopeLabel.FULL: make_full_envelope,
