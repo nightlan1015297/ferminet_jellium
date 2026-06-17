@@ -23,7 +23,7 @@
 #SBATCH --ntasks=1                              # Number of tasks
 #SBATCH --cpus-per-task=2                       # CPUs per task
 #SBATCH --mem=32G                               # Memory per node
-#SBATCH --gres=gpu:6                       # Request 6 GPUs
+#SBATCH --gres=gpu:4                       # Request 6 GPUs
 #SBATCH --output=slurm_logs/infer%j.out         # Log file (override per run)
 #SBATCH --error=slurm_logs/infer%j.err          # Error file (override per run)
 #---------------------------------------------------------------------#
