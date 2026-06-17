@@ -192,12 +192,12 @@ def get_config():
   # feature layer is needed (contrast the periodic HEG in ferminet.pbc).
   # ----------------------------------------------------------------------------
   cfg.network.network_type = 'psiformer'  # 'psiformer' or 'ferminet'.
-  cfg.network.determinants = 4            # Number of determinants.
+  cfg.network.determinants = 8            # Number of determinants.
   cfg.network.full_det = True             # Dense (vs block-sparse) determinant.
   cfg.network.bias_orbitals = False       # Bias in the orbital output layer.
   cfg.network.jastrow = 'default'         # 'default', 'none', or 'simple_ee'.
   cfg.network.rescale_inputs = False      # Rescale inputs to grow as log(|r|).
-  cfg.network.complex = False             # Real-valued wavefunction.
+  cfg.network.complex = True              # Real-valued wavefunction.
   # PsiFormer transformer hyperparameters (used when network_type='psiformer').
   cfg.network.psiformer.num_layers = 4
   cfg.network.psiformer.num_heads = 4
@@ -211,7 +211,7 @@ def get_config():
   # Optimisation / training. Modest defaults appropriate for the small (default
   # 2-electron) system; scale batch_size / iterations up for larger N.
   # ----------------------------------------------------------------------------
-  cfg.batch_size = 1024            # MCMC walkers / batch size.
+  cfg.batch_size = 3072            # MCMC walkers / batch size.
   cfg.optim.iterations = 150000     # Number of optimisation steps.
   cfg.optim.optimizer = 'kfac'     # 'kfac', 'adam', 'lamb', or 'none'.
   cfg.optim.laplacian = 'folx'  # 'default' or 'folx' (forward laplacian).
