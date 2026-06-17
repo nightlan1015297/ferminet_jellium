@@ -541,6 +541,8 @@ def train(cfg: ml_collections.ConfigDict, writer_manager=None):
   num_params = sum(x.size for x in jax.tree_util.tree_leaves(params))
   logging.info('Network: %s with %s trainable parameters.',
                cfg.network.network_type, f'{num_params:,}')
+  print(f'\nTotal NN model parameters: {num_params:,} '
+        f'(network "{cfg.network.network_type}")\n', flush=True)
   params = kfac_jax.utils.replicate_all_local_devices(
       params, axis_name=constants.PMAP_AXIS_NAME
   )
