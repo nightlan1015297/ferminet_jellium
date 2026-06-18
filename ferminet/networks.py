@@ -1235,7 +1235,7 @@ def make_orbitals(
     # Added pre-determinant for compatibility with pretraining.
     if jastrow_apply is not None:
       jastrow = jnp.exp(
-          jastrow_apply(r_ee, params['jastrow'], nspins) / sum(nspins)
+          jastrow_apply(r_ee, ae, params['jastrow'], nspins) / sum(nspins)
       )
       orbitals = [orbital * jastrow for orbital in orbitals]
 
