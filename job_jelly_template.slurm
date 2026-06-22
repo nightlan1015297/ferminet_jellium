@@ -16,7 +16,7 @@
 #SBATCH --ntasks=1                              # Number of tasks
 #SBATCH --cpus-per-task=2                       # CPUs per task
 #SBATCH --mem=32G                               # Memory per node
-#SBATCH --gres=gpu:6                       # Request 4 GPUs
+#SBATCH --gres=gpu:2                       # Request 4 GPUs
 #SBATCH --output=slurm_logs/job%j.out           # Log file (overridden by submit_sweep.sh)
 #SBATCH --error=slurm_logs/job%j.err            # Error file (overridden by submit_sweep.sh)
 #---------------------------------------------------------------------#
