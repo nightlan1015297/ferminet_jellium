@@ -2,4 +2,5 @@
 *.egg-info
 *.csv
 *.npz
-slurm_logs/
+slurm_logs/ 
+.DS_Store
